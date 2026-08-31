@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.artem.reservation.reservations.availability.ReservationAvailabilityService;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -123,13 +122,13 @@ public class ReservationService {
             throw new IllegalStateException("Can't approve reservation: status=" + reservationEntity.getStatus());
         }
 
-        var isAvaiableToApprove = availabilityService.isReservationAvailable(
+        var isAvailableToApprove = availabilityService.isReservationAvailable(
                 reservationEntity.getRoomId(),
                 reservationEntity.getStartDate(),
                 reservationEntity.getEndDate()
         );
 
-        if(!isAvaiableToApprove) {
+        if(!isAvailableToApprove) {
             throw new IllegalStateException("Can't approve reservation because of conflict");
         }
 
