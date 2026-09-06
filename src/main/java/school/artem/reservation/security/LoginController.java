@@ -16,32 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/*
-    authenticationResponse - берет логин и пароль из authenticationRequest
-    и через DaoAuthenticationProvider ищет пользователя и проверяет пароль
-    Если пароль неправильный, метод: authenticate(...) не вернёт нормальный результат,
-    а выбросит ошибку аутентификации.
-
-    SecurityContext — контейнер, где Spring хранит информацию о текущем авторизованном пользователе.
-    SecurityContextHolder — место, откуда Spring в рамках текущего запроса может узнать:
-    кто сейчас пользователь?
-    SecurityContextRepository - умеет сохранить пользователя, чтобы восстановить в следующем запросе.
-
- */
-/*
-    JSON из Postman
-    ↓
-    LoginRequest
-    ↓
-    создаём unauthenticated Authentication
-    ↓
-    AuthenticationManager.authenticate(...)
-    ↓
-    проверка логина и пароля
-    ↓
-    успешно → authenticationResponse
- */
-
 @RestController
 public class LoginController {
 
@@ -63,7 +37,6 @@ public class LoginController {
             HttpServletRequest request,
             HttpServletResponse response
     ) {
-        // Создаём объект Authentication, который пока ещё НЕ проверен.
         Authentication authenticationRequest =
                 UsernamePasswordAuthenticationToken.unauthenticated(
                         loginRequest.username(),
