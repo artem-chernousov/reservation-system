@@ -1,5 +1,6 @@
 package school.artem.reservation.security;
 
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -11,6 +12,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
@@ -21,12 +23,21 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private final UserRepository repository;
+
+    private final UserMapper userMapper;
+
+    public SecurityConfig(UserRepository repository, UserMapper userMapper) {
+        this.repository = repository;
+        this.userMapper = userMapper;
+    }
+
     @Bean
     public SecurityFilterChain securityFilter(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests((authorize) -> authorize
-                .requestMatchers("/login").permitAll()
+                .requestMatchers("/user/login", "/user/register").permitAll()
                 .anyRequest().authenticated()
         )
                 .httpBasic(Customizer.withDefaults());
@@ -50,12 +61,12 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService() {
-        UserDetails userDetails = User.withDefaultPasswordEncoder()
-                .username("user")
-                .password("password")
-                .roles("USER").build();
+        return username -> {
+            UserEntity userEntity = repository.findByUsername(username)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        return new InMemoryUserDetailsManager(userDetails);
+            return userMapper.toDetails(userEntity);
+        };
     }
 
     @Bean

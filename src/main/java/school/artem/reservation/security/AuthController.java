@@ -14,21 +14,40 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import school.artem.reservation.security.dto.LoginRequest;
+import school.artem.reservation.security.dto.RegisterRequest;
+import school.artem.reservation.security.dto.RegisterResponse;
 
 @RestController
-public class LoginController {
+@RequestMapping("/user")
+public class AuthController {
 
-    private static final Logger log = LoggerFactory.getLogger(LoginController.class);
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthenticationManager authenticationManager;
 
     private final SecurityContextRepository securityContextRepository =
             new HttpSessionSecurityContextRepository();
 
+    private final UserService userService;
 
-    public LoginController(AuthenticationManager authenticationManager) {
+
+    public AuthController(AuthenticationManager authenticationManager, UserService userService) {
         this.authenticationManager = authenticationManager;
+        this.userService = userService;
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<RegisterResponse> create(
+            @RequestBody RegisterRequest registerRequest
+    ) {
+        log.info("Called registerUser");
+
+        return ResponseEntity
+                .status(201)
+                .body(userService.registerUser(registerRequest));
     }
 
     @PostMapping("/login")
@@ -55,8 +74,6 @@ public class LoginController {
 
         log.info("User '{}' authenticated successfully", authenticationResponse.getName());
 
-        return ResponseEntity.ok(authenticationResponse.getName());
+        return ResponseEntity.ok("authenticated successfully");
     }
-
-    public record LoginRequest(String username, String password) {}
 }
