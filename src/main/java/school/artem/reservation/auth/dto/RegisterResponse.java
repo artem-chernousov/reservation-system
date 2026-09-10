@@ -1,6 +1,6 @@
-package school.artem.reservation.security.dto;
+package school.artem.reservation.auth.dto;
 
-import school.artem.reservation.security.Role;
+import school.artem.reservation.user.Role;
 
 public record RegisterResponse (
         Long id,

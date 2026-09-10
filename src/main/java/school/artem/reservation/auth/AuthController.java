@@ -1,4 +1,4 @@
-package school.artem.reservation.security;
+package school.artem.reservation.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,9 +16,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import school.artem.reservation.security.dto.LoginRequest;
-import school.artem.reservation.security.dto.RegisterRequest;
-import school.artem.reservation.security.dto.RegisterResponse;
+import school.artem.reservation.auth.dto.LoginRequest;
+import school.artem.reservation.auth.dto.RegisterRequest;
+import school.artem.reservation.auth.dto.RegisterResponse;
+import school.artem.reservation.user.UserService;
 
 @RestController
 @RequestMapping("/user")

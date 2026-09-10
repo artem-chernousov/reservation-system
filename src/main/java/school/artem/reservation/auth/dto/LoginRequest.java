@@ -1,4 +1,4 @@
-package school.artem.reservation.security.dto;
+package school.artem.reservation.auth.dto;
 
 public record LoginRequest (
         String username,
