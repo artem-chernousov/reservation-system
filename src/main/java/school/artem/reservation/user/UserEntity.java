@@ -1,4 +1,4 @@
-package school.artem.reservation.security;
+package school.artem.reservation.user;
 
 import jakarta.persistence.*;
 

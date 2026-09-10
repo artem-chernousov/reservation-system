@@ -1,4 +1,4 @@
-package school.artem.reservation.security;
+package school.artem.reservation.user;
 
 
 import org.springframework.data.jpa.repository.JpaRepository;

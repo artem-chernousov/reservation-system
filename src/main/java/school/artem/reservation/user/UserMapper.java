@@ -1,9 +1,9 @@
-package school.artem.reservation.security;
+package school.artem.reservation.user;
 
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
-import school.artem.reservation.security.dto.RegisterResponse;
+import school.artem.reservation.auth.dto.RegisterResponse;
 
 @Component
 public class UserMapper {

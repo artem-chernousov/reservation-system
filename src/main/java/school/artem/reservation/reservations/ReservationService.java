@@ -6,7 +6,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import school.artem.reservation.reservations.availability.CreateReservationRequest;
 import school.artem.reservation.reservations.availability.ReservationAvailabilityService;
+import school.artem.reservation.user.UserEntity;
+import school.artem.reservation.user.UserRepository;
 
 import java.util.List;
 
@@ -16,12 +19,15 @@ public class ReservationService {
 
     private final ReservationRepository repository;
 
+    private final UserRepository userRepository;
+
     private final ReservationMapper mapper;
 
     private final ReservationAvailabilityService availabilityService;
 
-    public ReservationService(ReservationRepository repository, ReservationMapper mapper, ReservationAvailabilityService availabilityService) {
+    public ReservationService(ReservationRepository repository, UserRepository userRepository, ReservationMapper mapper, ReservationAvailabilityService availabilityService) {
         this.repository = repository;
+        this.userRepository = userRepository;
         this.mapper = mapper;
         this.availabilityService = availabilityService;
     }
@@ -55,17 +61,24 @@ public class ReservationService {
         return allEntities.stream().map(mapper::toDomain).toList();
     }
 
-    public Reservation createReservation(Reservation reservationToCreate) {
-        if(reservationToCreate.status() != null) {
-            throw new IllegalArgumentException("Status should be empty.");
-        }
-
-        if(!reservationToCreate.endDate().isAfter(reservationToCreate.startDate())) {
+    public Reservation createReservation(CreateReservationRequest createRequest, String username) {
+        if(!createRequest.endDate().isAfter(createRequest.startDate())) {
             throw new IllegalArgumentException("Start date must be 1 day earlier than end date");
         }
 
+        UserEntity userEntity = userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        var reservationToCreate = new Reservation(
+                null,
+                userEntity.getId(),
+                createRequest.roomId(),
+                createRequest.startDate(),
+                createRequest.endDate(),
+                ReservationStatus.PENDING
+        );
+
         var entityToSave = mapper.toEntity(reservationToCreate);
-        entityToSave.setStatus(ReservationStatus.PENDING);
 
         var savedEntity = repository.save(entityToSave);
 

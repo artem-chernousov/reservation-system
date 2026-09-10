@@ -9,8 +9,12 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import school.artem.reservation.reservations.*;
+import school.artem.reservation.reservations.availability.CreateReservationRequest;
 import school.artem.reservation.reservations.availability.ReservationAvailabilityService;
 import org.springframework.data.domain.Pageable;
+import school.artem.reservation.user.Role;
+import school.artem.reservation.user.UserEntity;
+import school.artem.reservation.user.UserRepository;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,6 +34,9 @@ class ReservationServiceTest {
 
     @Mock
     private ReservationAvailabilityService availabilityService;
+
+    @Mock
+    private UserRepository userRepository;
 
     @Test
     void getReservationById_shouldReturnReservation() {
@@ -73,22 +80,28 @@ class ReservationServiceTest {
 
     @Test
     void createReservation_shouldCreateReservation() {
-        Reservation reservationToCreate = new Reservation(
-                null,
-                50L,
-                5L,
+        var createRequest = new CreateReservationRequest(
+                100L,
                 LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
-                null
+                LocalDate.of(2026, 8, 27)
+        );
+
+        var reservationToCreate = new Reservation(
+                null,
+                1L,
+                createRequest.roomId(),
+                createRequest.startDate(),
+                createRequest.endDate(),
+                ReservationStatus.PENDING
         );
 
         ReservationEntity reservationToSave = new ReservationEntity();
         ReservationEntity savedEntity = new ReservationEntity();
 
-        Reservation expectedReservation = new Reservation(
+        var expectedReservation = new Reservation(
                 1L,
-                50L,
-                5L,
+                1L,
+                100L,
                 LocalDate.of(2026, 8, 25),
                 LocalDate.of(2026, 8, 27),
                 ReservationStatus.PENDING
@@ -98,40 +111,36 @@ class ReservationServiceTest {
         Mockito.when(repository.save(reservationToSave)).thenReturn(savedEntity);
         Mockito.when(mapper.toDomain(savedEntity)).thenReturn(expectedReservation);
 
-        Reservation result = reservationService.createReservation(reservationToCreate);
+        String name = "Artem";
 
-        Assertions.assertEquals(expectedReservation, result);
-        Assertions.assertEquals(ReservationStatus.PENDING, reservationToSave.getStatus());
-
-        Mockito.verify(repository, Mockito.times(1)).save(reservationToSave);
-    }
-
-    @Test
-    void createReservation_withNotNullStatus_ThrowsException() {
-        Reservation reservationToCreate = new Reservation(
-                null,
-                50L,
-                5L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
-                ReservationStatus.PENDING
+        var userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
         );
 
-        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.createReservation(reservationToCreate));
+        Mockito.when(userRepository.findByUsername(name)).thenReturn(Optional.of(userEntity));
+
+        Reservation result = reservationService.createReservation(createRequest, name);
+
+        Assertions.assertEquals(expectedReservation, result);
+
+        Mockito.verify(mapper).toEntity(reservationToCreate);
+        Mockito.verify(repository, Mockito.times(1)).save(reservationToSave);
+        Mockito.verify(userRepository).findByUsername(name);
     }
 
     @Test
     void createReservation_withStartDateAfterEndDate_ThrowsException() {
-        Reservation reservationToCreate = new Reservation(
-                null,
-                50L,
-                5L,
+        var reservationToCreate = new CreateReservationRequest(
+                100L,
                 LocalDate.of(2026, 8, 27),
-                LocalDate.of(2026, 8, 25),
-                null
+                LocalDate.of(2026, 8, 25)
         );
 
-        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.createReservation(reservationToCreate));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.createReservation(reservationToCreate, "Artem"));
+        Mockito.verify(repository, Mockito.never()).save(Mockito.any());
     }
 
     @Test
