@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import school.artem.reservation.reservations.availability.CreateReservationRequest;
+import school.artem.reservation.reservations.availability.UpdateReservationRequest;
 
 import java.util.List;
 
@@ -26,16 +27,32 @@ public class ReservationController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Reservation> getReservationById(
-            @PathVariable("id") Long id
+            @PathVariable("id") Long id,
+            Authentication authentication
     ){
+
+        String username = authentication.getName();
+
         log.info("Called getReservationById: id={}", id);
 
         return ResponseEntity.status(HttpStatus.OK)
-                    .body(reservationService.getReservationById(id));
+                .body(reservationService.getReservationById(id, username));
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<Reservation>> getAllReservations(
+            Authentication authentication
+    ){
+
+        String username = authentication.getName();
+
+        log.info("Called getAllReservationsById: username={}", username);
+
+        return ResponseEntity.ok(reservationService.getAllReservations(username));
     }
 
     @GetMapping
-    public ResponseEntity<List<Reservation>> getAllReservations(
+    public ResponseEntity<List<Reservation>> searchAllByFilter(
             @RequestParam(name = "roomId", required = false) Long roomId,
             @RequestParam(name = "userId", required = false) Long userId,
             @RequestParam(name = "pageSize", required = false) Integer pageSize,
@@ -69,23 +86,31 @@ public class ReservationController {
     @PutMapping("/{id}")
     public ResponseEntity<Reservation> updateReservation(
             @PathVariable("id") Long id,
-            @RequestBody @Valid Reservation reservationToUpdate
+            @RequestBody @Valid UpdateReservationRequest updateReservationRequest,
+            Authentication authentication
     ) {
-        log.info("Called updateReservation id={}, reservationToUpdate={}", id, reservationToUpdate);
-        var updated = reservationService.updateReservation(id, reservationToUpdate);
+
+        String username = authentication.getName();
+
+        log.info("User {} updating reservation id={}", username, id);
+        var updated = reservationService.updateReservation(id, updateReservationRequest, username);
 
         return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}/cancel")
-    public ResponseEntity<Void> deleteReservation(
-            @PathVariable("id") Long id
+    public ResponseEntity<String> cancelReservation(
+            @PathVariable("id") Long id,
+            Authentication authentication
     ) {
+
+        String username = authentication.getName();
+
         log.info("Called deleteReservation id={}", id);
 
-        reservationService.cancelReservation(id);
+        reservationService.cancelReservation(id, username);
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok("Reservation cancelled successfully");
     }
 
     @PostMapping("/{id}/approve")

@@ -4,12 +4,15 @@ import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.artem.reservation.reservations.availability.CreateReservationRequest;
 import school.artem.reservation.reservations.availability.ReservationAvailabilityService;
+import school.artem.reservation.reservations.availability.UpdateReservationRequest;
 import school.artem.reservation.user.UserEntity;
 import school.artem.reservation.user.UserRepository;
+import school.artem.reservation.web.UserNotFoundException;
 
 import java.util.List;
 
@@ -32,12 +35,33 @@ public class ReservationService {
         this.availabilityService = availabilityService;
     }
 
-    public Reservation getReservationById(Long id) {
-        ReservationEntity reservationEntity = repository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Not found reservation by id = " + id
-                ));
+    public Reservation getReservationById(Long id, String username) {
+        UserEntity userEntity = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        var reservationEntity = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Not found reservation by id = " + id));
+
+
+        Long userId = userEntity.getId();
+        Long userIdReservation = reservationEntity.getUserId();
+
+        if(!userId.equals(userIdReservation)) {
+            throw new AccessDeniedException("You can't get this reservation");
+        }
+
         return mapper.toDomain(reservationEntity);
+    }
+
+    public List<Reservation> getAllReservations(String username) {
+        UserEntity userEntity = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        Long userId = userEntity.getId();
+
+        List<ReservationEntity> allEntities = repository.findAllByUserIdOrderByIdAsc(userId);
+
+        return allEntities.stream().map(mapper::toDomain).toList();
     }
 
     public List<Reservation> searchAllByFilter(
@@ -63,11 +87,11 @@ public class ReservationService {
 
     public Reservation createReservation(CreateReservationRequest createRequest, String username) {
         if(!createRequest.endDate().isAfter(createRequest.startDate())) {
-            throw new IllegalArgumentException("Start date must be 1 day earlier than end date");
+            throw new IllegalArgumentException("End date must be after start date");
         }
 
         UserEntity userEntity = userRepository.findByUsername(username)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         var reservationToCreate = new Reservation(
                 null,
@@ -87,21 +111,44 @@ public class ReservationService {
 
     public Reservation updateReservation(
             Long id,
-            Reservation reservationToUpdate
+            UpdateReservationRequest updateReservation,
+            String username
     ) {
+
+        UserEntity userEntity = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        Long userId = userEntity.getId();
+
         var reservationEntity = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Not found reservation by id = " + id));
+
+        Long idUserReservation = reservationEntity.getUserId();
+
+        if(!idUserReservation.equals(userId)) {
+            throw new AccessDeniedException("You can't modify this reservation");
+        }
 
         if(reservationEntity.getStatus() != ReservationStatus.PENDING) {
             throw new IllegalStateException("Can't modify reservation: status=" + reservationEntity.getStatus());
         }
 
-        if(!reservationToUpdate.endDate().isAfter(reservationToUpdate.startDate())) {
-            throw new IllegalArgumentException("Start date must be 1 day earlier than end date");
+        if(!updateReservation.endDate().isAfter(updateReservation.startDate())) {
+            throw new IllegalArgumentException("End date must be after start date");
         }
+
+        var reservationToUpdate = new Reservation(
+                null,
+                userEntity.getId(),
+                updateReservation.roomId(),
+                updateReservation.startDate(),
+                updateReservation.endDate(),
+                ReservationStatus.PENDING
+        );
 
         var reservationToSave = mapper.toEntity(reservationToUpdate);
         reservationToSave.setId(reservationEntity.getId());
+        reservationToSave.setUserId(userEntity.getId());
         reservationToSave.setStatus(ReservationStatus.PENDING);
 
         var updatedReservation = repository.save(reservationToSave);
@@ -111,9 +158,21 @@ public class ReservationService {
 
 
     @Transactional
-    public void cancelReservation(Long id) {
+    public void cancelReservation(Long id, String username) {
+        UserEntity userEntity = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        Long userId = userEntity.getId();
+
+
         var reservation = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Not found reservation by id = " + id));
+
+        Long idUserReservation = reservation.getUserId();
+
+        if(!idUserReservation.equals(userId)) {
+            throw new AccessDeniedException("You can't cancel this reservation");
+        }
 
         if(reservation.getStatus().equals(ReservationStatus.APPROVED)) {
             throw new IllegalStateException("Can't cancel approved reservation. Contact with manager please");
