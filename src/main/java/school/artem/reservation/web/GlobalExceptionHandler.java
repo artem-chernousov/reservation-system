@@ -111,7 +111,7 @@ public class GlobalExceptionHandler {
         log.error("Handle userNotFoundException", e);
 
         var errorDto = new ErrorResponseDto(
-                "Forbidden",
+                "Not Found",
                 e.getMessage(),
                 LocalDateTime.now()
         );
