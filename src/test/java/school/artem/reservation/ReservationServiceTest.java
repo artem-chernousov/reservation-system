@@ -8,13 +8,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 import school.artem.reservation.reservations.*;
 import school.artem.reservation.reservations.availability.CreateReservationRequest;
 import school.artem.reservation.reservations.availability.ReservationAvailabilityService;
 import org.springframework.data.domain.Pageable;
+import school.artem.reservation.reservations.availability.UpdateReservationRequest;
 import school.artem.reservation.user.Role;
 import school.artem.reservation.user.UserEntity;
 import school.artem.reservation.user.UserRepository;
+import school.artem.reservation.web.UserNotFoundException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -42,27 +45,44 @@ class ReservationServiceTest {
     void getReservationById_shouldReturnReservation() {
         Long id = 1L;
 
-        ReservationEntity reservationEntity = new ReservationEntity();
+        var userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                1L,
+                1L,
+                5L,
+                LocalDate.of(2026, 9, 12),
+                LocalDate.of(2026, 10, 27),
+                ReservationStatus.PENDING
+        );
 
         Reservation expectedReservation = new Reservation(
                 1L,
-                50L,
+                1L,
                 5L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
+                LocalDate.of(2026, 9, 12),
+                LocalDate.of(2026, 10, 27),
                 ReservationStatus.PENDING
         );
 
         Mockito.when(repository.findById(id))
                 .thenReturn(Optional.of(reservationEntity));
 
-        Mockito.when(mapper.toDomain(reservationEntity))
-                .thenReturn(expectedReservation);
+        Mockito.when(userRepository.findByUsername("Artem"))
+                .thenReturn(Optional.of(userEntity));
 
-        Reservation result = reservationService.getReservationById(id);
+        Mockito.when(mapper.toDomain(reservationEntity)).thenReturn(expectedReservation);
+
+        Reservation result = reservationService.getReservationById(id, "Artem");
 
         Assertions.assertEquals(expectedReservation, result);
 
+        Mockito.verify(userRepository).findByUsername("Artem");
         Mockito.verify(repository).findById(id);
         Mockito.verify(mapper).toDomain(reservationEntity);
     }
@@ -71,10 +91,117 @@ class ReservationServiceTest {
     void getReservationById_shouldThrowException_whenEntityNotFound() {
         Long id = 1L;
 
+        var userEntity = new UserEntity();
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
         Mockito.when(repository.findById(id)).thenReturn(Optional.empty());
 
-        Assertions.assertThrows(EntityNotFoundException.class, () -> reservationService.getReservationById(id));
+        Assertions.assertThrows(EntityNotFoundException.class, () -> reservationService.getReservationById(id, "Artem"));
 
+        Mockito.verify(mapper, Mockito.never()).toDomain(Mockito.any());
+    }
+
+    @Test
+    void getReservationById_shouldThrowException_whenReservationBelongsToAnotherUser() {
+        Long id = 1L;
+
+        var userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                1L,
+                2L,
+                5L,
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
+                ReservationStatus.PENDING
+        );
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
+        Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
+
+        Assertions.assertThrows(AccessDeniedException.class, () -> reservationService.getReservationById(id, "Artem"));
+
+        Mockito.verify(mapper, Mockito.never()).toDomain(Mockito.any());
+    }
+
+    @Test
+    void getReservationById_shouldThrowException_whenUserNotFound() {
+        Long id = 1L;
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(UserNotFoundException.class, () -> reservationService.getReservationById(id, "Artem"));
+
+        Mockito.verify(repository, Mockito.never()).findById(Mockito.anyLong());
+        Mockito.verify(mapper, Mockito.never()).toDomain(Mockito.any());
+    }
+
+    @Test
+    void getAllReservations_shouldReturnAllReservations() {
+        var userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        ReservationEntity entity1 = new ReservationEntity();
+        ReservationEntity entity2 = new ReservationEntity();
+
+        List<ReservationEntity> allReservations = List.of(entity1, entity2);
+
+        Reservation expectedReservation1 = new Reservation(
+                1L,
+                userEntity.getId(),
+                5L,
+                LocalDate.of(2026, 9, 11),
+                LocalDate.of(2026, 10, 27),
+                ReservationStatus.PENDING
+        );
+
+        Reservation expectedReservation2 = new Reservation(
+                1L,
+                userEntity.getId(),
+                5L,
+                LocalDate.of(2026, 9, 12),
+                LocalDate.of(2026, 10, 27),
+                ReservationStatus.PENDING
+        );
+
+        List<Reservation> expectedListOfReservations = List.of(expectedReservation1, expectedReservation2);
+
+        Mockito.when(userRepository.findByUsername("Artem"))
+                .thenReturn(Optional.of(userEntity));
+
+        Mockito.when(repository.findAllByUserIdOrderByIdAsc(1L))
+                .thenReturn(allReservations);
+
+
+        Mockito.when(mapper.toDomain(entity1)).thenReturn(expectedReservation1);
+        Mockito.when(mapper.toDomain(entity2)).thenReturn(expectedReservation2);
+
+        List<Reservation> result = reservationService.getAllReservations("Artem");
+
+        Assertions.assertEquals(expectedListOfReservations, result);
+
+        Mockito.verify(userRepository).findByUsername("Artem");
+        Mockito.verify(repository).findAllByUserIdOrderByIdAsc(userEntity.getId());
+        Mockito.verify(mapper).toDomain(entity1);
+        Mockito.verify(mapper).toDomain(entity2);
+    }
+
+    @Test
+    void getAllReservations_shouldThrowException_whenUserNotFound() {
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(UserNotFoundException.class, () -> reservationService.getAllReservations("Artem"));
+
+        Mockito.verify(repository, Mockito.never()).findAllByUserIdOrderByIdAsc(Mockito.any());
         Mockito.verify(mapper, Mockito.never()).toDomain(Mockito.any());
     }
 
@@ -256,9 +383,23 @@ class ReservationServiceTest {
     void updateReservation_shouldUpdateReservation() {
         Long id = 1L;
 
+        UpdateReservationRequest updateReservation = new UpdateReservationRequest(
+                5L,
+                LocalDate.of(2026, 8, 25),
+                LocalDate.of(2026, 8, 27)
+
+        );
+
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
         Reservation reservationToUpdate = new Reservation(
                 null,
-                50L,
+                userEntity.getId(),
                 5L,
                 LocalDate.of(2026, 8, 25),
                 LocalDate.of(2026, 8, 27),
@@ -267,30 +408,32 @@ class ReservationServiceTest {
 
         ReservationEntity reservationEntity = new ReservationEntity(
                 1L,
-                50L,
+                userEntity.getId(),
                 5L,
                 LocalDate.of(2026, 8, 23),
                 LocalDate.of(2026, 8, 24),
                 ReservationStatus.PENDING
         );
+
         ReservationEntity reservationToSave = new ReservationEntity();
         ReservationEntity updatedReservation = new ReservationEntity();
 
         Reservation expectedReservation = new Reservation(
-                1L,
-                50L,
+                null,
+                userEntity.getId(),
                 5L,
                 LocalDate.of(2026, 8, 25),
                 LocalDate.of(2026, 8, 27),
                 ReservationStatus.PENDING
         );
 
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
         Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
         Mockito.when(mapper.toEntity(reservationToUpdate)).thenReturn(reservationToSave);
         Mockito.when(repository.save(reservationToSave)).thenReturn(updatedReservation);
         Mockito.when(mapper.toDomain(updatedReservation)).thenReturn(expectedReservation);
 
-        Reservation actual = reservationService.updateReservation(id, reservationToUpdate);
+        Reservation actual = reservationService.updateReservation(id, updateReservation, "Artem");
 
         Assertions.assertEquals(expectedReservation, actual);
         Assertions.assertEquals(ReservationStatus.PENDING, reservationToSave.getStatus());
@@ -303,27 +446,32 @@ class ReservationServiceTest {
     void updateReservation_shouldThrowException_whenStatusNotPending() {
         Long id = 1L;
 
-        Reservation reservationToUpdate = new Reservation(
-                null,
-                50L,
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        UpdateReservationRequest updateRequest = new UpdateReservationRequest(
                 5L,
                 LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
-                ReservationStatus.PENDING
+                LocalDate.of(2026, 8, 27)
         );
 
         ReservationEntity reservationEntity = new ReservationEntity(
-                1L,
-                50L,
+                null,
+                userEntity.getId(),
                 5L,
                 LocalDate.of(2026, 8, 23),
                 LocalDate.of(2026, 8, 24),
                 ReservationStatus.APPROVED
         );
 
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
         Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
 
-        Assertions.assertThrows(IllegalStateException.class, () -> reservationService.updateReservation(id, reservationToUpdate));
+        Assertions.assertThrows(IllegalStateException.class, () -> reservationService.updateReservation(id, updateRequest, "Artem"));
         Mockito.verify(repository, Mockito.never()).save(Mockito.any());
     }
 
@@ -331,27 +479,32 @@ class ReservationServiceTest {
     void updateReservation_withStartDateAfterEndDate_ThrowsException() {
         Long id = 1L;
 
-        Reservation reservationToUpdate = new Reservation(
-                null,
-                50L,
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        UpdateReservationRequest updateRequest = new UpdateReservationRequest(
                 5L,
                 LocalDate.of(2026, 8, 27),
-                LocalDate.of(2026, 8, 25),
-                ReservationStatus.PENDING
+                LocalDate.of(2026, 8, 25)
         );
 
         ReservationEntity reservationEntity = new ReservationEntity(
-                1L,
-                50L,
+                null,
+                userEntity.getId(),
                 5L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
                 ReservationStatus.PENDING
         );
 
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
         Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
 
-        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.updateReservation(id, reservationToUpdate));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.updateReservation(id, updateRequest, "Artem"));
         Mockito.verify(repository, Mockito.never()).save(Mockito.any());
     }
 
@@ -359,87 +512,191 @@ class ReservationServiceTest {
     void updateReservation_withStartDateEqualsEndDate_ThrowsException() {
         Long id = 1L;
 
-        Reservation reservationToUpdate = new Reservation(
-                null,
-                50L,
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        UpdateReservationRequest updateRequest = new UpdateReservationRequest(
                 5L,
                 LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 25),
-                ReservationStatus.PENDING
+                LocalDate.of(2026, 8, 25)
         );
 
         ReservationEntity reservationEntity = new ReservationEntity(
-                1L,
-                50L,
+                null,
+                userEntity.getId(),
                 5L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
                 ReservationStatus.PENDING
         );
 
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
         Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
 
-        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.updateReservation(id, reservationToUpdate));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.updateReservation(id, updateRequest, "Artem"));
         Mockito.verify(repository, Mockito.never()).save(Mockito.any());
     }
 
     @Test
-    void updateReservation_shouldThrowException_whenEntityNotFound() {
+    void updateReservation_shouldThrowException_whenUserNotFound() {
         Long id = 1L;
 
-        Reservation reservationToUpdate = new Reservation(
-                null,
-                50L,
+        UpdateReservationRequest updateRequest = new UpdateReservationRequest(
                 5L,
                 LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
-                null
+                LocalDate.of(2026, 8, 25)
         );
 
-        Mockito.when(repository.findById(id)).thenReturn(Optional.empty());
-
-        Assertions.assertThrows(EntityNotFoundException.class, () -> reservationService.updateReservation(id, reservationToUpdate));
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.empty());
+        Assertions.assertThrows(UserNotFoundException.class, () -> reservationService.updateReservation(id, updateRequest, "Artem"));
         Mockito.verify(mapper, Mockito.never()).toEntity(Mockito.any());
         Mockito.verify(repository, Mockito.never()).save(Mockito.any());
         Mockito.verify(mapper, Mockito.never()).toDomain(Mockito.any());
     }
 
     @Test
-    void cancelReservation_shouldCancelReservation() {
+    void updateReservation_shouldThrowException_whenEntityNotFound() {
         Long id = 1L;
+
+        UserEntity userEntity = new UserEntity();
+
+        UpdateReservationRequest updateRequest = new UpdateReservationRequest(
+                5L,
+                LocalDate.of(2026, 8, 25),
+                LocalDate.of(2026, 8, 27)
+        );
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
+        Mockito.when(repository.findById(id)).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(EntityNotFoundException.class, () -> reservationService.updateReservation(id, updateRequest, "Artem"));
+        Mockito.verify(mapper, Mockito.never()).toEntity(Mockito.any());
+        Mockito.verify(repository, Mockito.never()).save(Mockito.any());
+        Mockito.verify(mapper, Mockito.never()).toDomain(Mockito.any());
+    }
+
+    @Test
+    void updateReservation_shouldThrowException_whenReservationBelongsToAnotherUser() {
+        Long id = 1L;
+
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        UpdateReservationRequest updateRequest = new UpdateReservationRequest(
+                5L,
+                LocalDate.of(2026, 8, 25),
+                LocalDate.of(2026, 8, 27)
+        );
 
         ReservationEntity reservationEntity = new ReservationEntity(
                 1L,
-                50L,
+                2L,
                 5L,
                 LocalDate.of(2026, 8, 23),
                 LocalDate.of(2026, 8, 24),
                 ReservationStatus.PENDING
         );
 
+        Mockito.when(userRepository.findByUsername("Artem"))
+                .thenReturn(Optional.of(userEntity));
+
+        Mockito.when(repository.findById(id))
+                .thenReturn(Optional.of(reservationEntity));
+
+        Assertions.assertThrows(AccessDeniedException.class,
+                () -> reservationService.updateReservation(id, updateRequest, "Artem"));
+        Mockito.verify(repository, Mockito.never()).save(Mockito.any());
+    }
+
+    @Test
+    void cancelReservation_shouldCancelReservation() {
+        Long id = 1L;
+
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                1L,
+                userEntity.getId(),
+                5L,
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
+                ReservationStatus.PENDING
+        );
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
+
         Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
 
-        reservationService.cancelReservation(id);
+        reservationService.cancelReservation(id, "Artem");
 
         Mockito.verify(repository).setStatus(id, ReservationStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelReservation_shouldThrowException_whenReservationBelongsToAnotherUser() {
+        Long id = 1L;
+
+        var userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                1L,
+                2L,
+                5L,
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
+                ReservationStatus.PENDING
+        );
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
+        Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
+
+        Assertions.assertThrows(AccessDeniedException.class, () -> reservationService.cancelReservation(id, "Artem"));
+        Mockito.verify(repository, Mockito.never())
+                .setStatus(Mockito.anyLong(), Mockito.any());
     }
 
     @Test
     void cancelReservation_shouldThrowException_whenStatusApproved() {
         Long id = 1L;
 
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
         ReservationEntity reservationEntity = new ReservationEntity(
                 1L,
-                50L,
+                userEntity.getId(),
                 5L,
                 LocalDate.of(2026, 8, 23),
                 LocalDate.of(2026, 8, 24),
                 ReservationStatus.APPROVED
         );
 
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
         Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
 
-        Assertions.assertThrows(IllegalStateException.class, () -> reservationService.cancelReservation(id));
+        Assertions.assertThrows(IllegalStateException.class, () -> reservationService.cancelReservation(id, "Artem"));
         Mockito.verify(repository, Mockito.never())
                 .setStatus(Mockito.anyLong(), Mockito.any());
     }
@@ -448,18 +705,26 @@ class ReservationServiceTest {
     void cancelReservation_shouldThrowException_whenStatusCancelled() {
         Long id = 1L;
 
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
         ReservationEntity reservationEntity = new ReservationEntity(
                 1L,
-                50L,
+                userEntity.getId(),
                 5L,
                 LocalDate.of(2026, 8, 23),
                 LocalDate.of(2026, 8, 24),
                 ReservationStatus.CANCELLED
         );
 
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
         Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
 
-        Assertions.assertThrows(IllegalStateException.class, () -> reservationService.cancelReservation(id));
+        Assertions.assertThrows(IllegalStateException.class, () -> reservationService.cancelReservation(id, "Artem"));
         Mockito.verify(repository, Mockito.never())
                 .setStatus(Mockito.anyLong(), Mockito.any());
     }
@@ -468,9 +733,27 @@ class ReservationServiceTest {
     void cancelReservation_shouldThrowException_whenEntityNotFound() {
         Long id = 1L;
 
+        var userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
         Mockito.when(repository.findById(id)).thenReturn(Optional.empty());
 
-        Assertions.assertThrows(EntityNotFoundException.class, () -> reservationService.cancelReservation(id));
+        Assertions.assertThrows(EntityNotFoundException.class, () -> reservationService.cancelReservation(id, "Artem"));
+        Mockito.verify(repository, Mockito.never()).setStatus(Mockito.any(), Mockito.any());
+    }
+
+    @Test
+    void cancelReservation_shouldThrowException_whenUserNotFound() {
+        Long id = 1L;
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(UserNotFoundException.class, () -> reservationService.cancelReservation(id, "Artem"));
         Mockito.verify(repository, Mockito.never()).setStatus(Mockito.any(), Mockito.any());
     }
 

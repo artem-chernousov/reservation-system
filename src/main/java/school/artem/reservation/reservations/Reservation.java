@@ -10,7 +10,7 @@ public record Reservation (
         @Null
         Long id,
 
-        @NotNull
+        @Null
         Long userId,
 
         @NotNull

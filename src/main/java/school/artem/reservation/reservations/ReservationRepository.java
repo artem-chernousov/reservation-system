@@ -45,4 +45,13 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
             @Param("userId") Long userId,
             Pageable pageable
     );
+
+//    @Query("""
+//            select r from ReservationEntity r
+//            where r.userId = :userId
+//            order by r.id
+//            """)
+    List<ReservationEntity> findAllByUserIdOrderByIdAsc(
+            @Param("userId") Long userId
+    );
 }
