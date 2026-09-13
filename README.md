@@ -107,7 +107,43 @@ Subsequent requests are associated with the authenticated user through the sessi
 
 Passwords are stored using Spring Security's `DelegatingPasswordEncoder`.
 
-## Example
+## Running Locally
+
+### Requirements
+
+- Java 21
+- Docker or a local PostgreSQL installation
+
+Start PostgreSQL with Docker, for example:
+
+```bash
+docker run --name reservation-postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -p 5432:5432 \
+  -d postgres
+```
+
+Set the database credentials expected by `application.properties`:
+
+```bash
+export DB_USERNAME=postgres
+export DB_PASSWORD=postgres
+```
+
+Run the application:
+
+```bash
+./mvnw spring-boot:run
+```
+
+The API is available at:
+
+```text
+http://localhost:8080
+```
+
+
+## API Usage Example
 
 Register a user:
 
@@ -140,41 +176,6 @@ curl -X POST http://localhost:8080/reservation \
 ```
 
 The client does not send `userId` or `status`; both are controlled by the server.
-
-## Running Locally
-
-### Requirements
-
-- Java 21+
-- Docker or a local PostgreSQL installation
-
-Start PostgreSQL with Docker, for example:
-
-```bash
-docker run --name reservation-postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 \
-  -d postgres
-```
-
-Set the database credentials expected by `application.properties`:
-
-```bash
-export DB_USERNAME=postgres
-export DB_PASSWORD=postgres
-```
-
-Run the application:
-
-```bash
-./mvnw spring-boot:run
-```
-
-The API is available at:
-
-```text
-http://localhost:8080
-```
 
 ## Testing
 
@@ -211,7 +212,3 @@ The API uses a centralized `GlobalExceptionHandler` for consistent HTTP response
 - Add controller/security integration tests
 - Add OpenAPI / Swagger documentation
 - Review CSRF strategy before production-style browser usage
-
-## Development Notes
-
-This project is under active development and is being built incrementally, with each security and authorization step covered by tests before the next role or feature is added.
