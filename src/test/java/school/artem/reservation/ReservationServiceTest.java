@@ -207,10 +207,13 @@ class ReservationServiceTest {
 
     @Test
     void createReservation_shouldCreateReservation() {
+        LocalDate startDate = LocalDate.now().plusDays(1);
+        LocalDate endDate = LocalDate.now().plusDays(3);
+
         var createRequest = new CreateReservationRequest(
                 100L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27)
+                startDate,
+                endDate
         );
 
         var reservationToCreate = new Reservation(
@@ -229,8 +232,8 @@ class ReservationServiceTest {
                 1L,
                 1L,
                 100L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
+                startDate,
+                endDate,
                 ReservationStatus.PENDING
         );
 
@@ -263,6 +266,18 @@ class ReservationServiceTest {
         var reservationToCreate = new CreateReservationRequest(
                 100L,
                 LocalDate.of(2026, 8, 27),
+                LocalDate.of(2026, 8, 25)
+        );
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.createReservation(reservationToCreate, "Artem"));
+        Mockito.verify(repository, Mockito.never()).save(Mockito.any());
+    }
+
+    @Test
+    void createReservation_withStartDateInPast_ThrowsException() {
+        var reservationToCreate = new CreateReservationRequest(
+                100L,
+                LocalDate.of(2026, 8, 13),
                 LocalDate.of(2026, 8, 25)
         );
 
@@ -383,10 +398,13 @@ class ReservationServiceTest {
     void updateReservation_shouldUpdateReservation() {
         Long id = 1L;
 
+        LocalDate startDate = LocalDate.now().plusDays(1);
+        LocalDate endDate = LocalDate.now().plusDays(3);
+
         UpdateReservationRequest updateReservation = new UpdateReservationRequest(
                 5L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27)
+                startDate,
+                endDate
 
         );
 
@@ -401,8 +419,8 @@ class ReservationServiceTest {
                 null,
                 userEntity.getId(),
                 5L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
+                startDate,
+                endDate,
                 ReservationStatus.PENDING
         );
 
@@ -422,8 +440,8 @@ class ReservationServiceTest {
                 null,
                 userEntity.getId(),
                 5L,
-                LocalDate.of(2026, 8, 25),
-                LocalDate.of(2026, 8, 27),
+                startDate,
+                endDate,
                 ReservationStatus.PENDING
         );
 
@@ -523,6 +541,42 @@ class ReservationServiceTest {
                 5L,
                 LocalDate.of(2026, 8, 25),
                 LocalDate.of(2026, 8, 25)
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                null,
+                userEntity.getId(),
+                5L,
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
+                ReservationStatus.PENDING
+        );
+
+        Mockito.when(userRepository.findByUsername("Artem")).thenReturn(Optional.of(userEntity));
+        Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> reservationService.updateReservation(id, updateRequest, "Artem"));
+        Mockito.verify(repository, Mockito.never()).save(Mockito.any());
+    }
+
+    @Test
+    void updateReservation_withStartDateInPast_ThrowsException() {
+        Long id = 1L;
+
+        LocalDate startDate = LocalDate.now().minusDays(1);
+        LocalDate endDate = LocalDate.now().plusDays(3);
+
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "Artem",
+                "password",
+                Role.USER
+        );
+
+        UpdateReservationRequest updateRequest = new UpdateReservationRequest(
+                5L,
+                startDate,
+                endDate
         );
 
         ReservationEntity reservationEntity = new ReservationEntity(
