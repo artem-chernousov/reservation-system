@@ -14,6 +14,7 @@ import school.artem.reservation.user.UserEntity;
 import school.artem.reservation.user.UserRepository;
 import school.artem.reservation.web.UserNotFoundException;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -90,6 +91,10 @@ public class ReservationService {
             throw new IllegalArgumentException("End date must be after start date");
         }
 
+        if(createRequest.startDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Start date can't be in the past");
+        }
+
         UserEntity userEntity = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
@@ -135,6 +140,10 @@ public class ReservationService {
 
         if(!updateReservation.endDate().isAfter(updateReservation.startDate())) {
             throw new IllegalArgumentException("End date must be after start date");
+        }
+
+        if(updateReservation.startDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Start date can't be in the past");
         }
 
         var reservationToUpdate = new Reservation(
