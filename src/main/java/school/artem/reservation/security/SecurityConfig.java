@@ -2,6 +2,7 @@ package school.artem.reservation.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -36,9 +37,16 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests((authorize) -> authorize
-                .requestMatchers("/user/login", "/user/register").permitAll()
-                .anyRequest().authenticated()
-        )
+                        .requestMatchers("/user/login", "/user/register").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/reservation")
+                        .hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/reservation/*/approve")
+                        .hasRole("ADMIN")
+
+                        .anyRequest().authenticated()
+                )
                 .httpBasic(Customizer.withDefaults());
 
         return http.build();
