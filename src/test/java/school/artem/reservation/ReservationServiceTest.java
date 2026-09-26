@@ -88,6 +88,54 @@ class ReservationServiceTest {
     }
 
     @Test
+    void getReservationById_shouldReturnReservation_whenUserIsAdmin() {
+        Long id = 1L;
+
+        var userEntity = new UserEntity(
+                1L,
+                "admin",
+                "admin123",
+                Role.ADMIN
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                1L,
+                2L,
+                5L,
+                LocalDate.of(2026, 9, 12),
+                LocalDate.of(2026, 10, 27),
+                ReservationStatus.PENDING
+        );
+
+        Reservation expectedReservation = new Reservation(
+                1L,
+                2L,
+                5L,
+                LocalDate.of(2026, 9, 12),
+                LocalDate.of(2026, 10, 27),
+                ReservationStatus.PENDING
+        );
+
+        Mockito.when(userRepository.findByUsername("admin"))
+                .thenReturn(Optional.of(userEntity));
+
+        Mockito.when(repository.findById(id))
+                .thenReturn(Optional.of(reservationEntity));
+
+
+        Mockito.when(mapper.toDomain(reservationEntity))
+                .thenReturn(expectedReservation);
+
+        Reservation result = reservationService.getReservationById(id, "admin");
+
+        Assertions.assertEquals(expectedReservation, result);
+
+        Mockito.verify(userRepository).findByUsername("admin");
+        Mockito.verify(repository).findById(id);
+        Mockito.verify(mapper).toDomain(reservationEntity);
+    }
+
+    @Test
     void getReservationById_shouldThrowException_whenEntityNotFound() {
         Long id = 1L;
 
@@ -461,6 +509,81 @@ class ReservationServiceTest {
     }
 
     @Test
+    void updateReservation_shouldUpdateReservation_whenUserIsAdmin() {
+        Long id = 1L;
+
+        LocalDate startDate = LocalDate.now().plusDays(1);
+        LocalDate endDate = LocalDate.now().plusDays(3);
+
+        UpdateReservationRequest updateReservation = new UpdateReservationRequest(
+                5L,
+                startDate,
+                endDate
+        );
+
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "admin",
+                "admin123",
+                Role.ADMIN
+        );
+
+        Reservation reservationToUpdate = new Reservation(
+                null,
+                2L,
+                5L,
+                startDate,
+                endDate,
+                ReservationStatus.PENDING
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                1L,
+                2L,
+                5L,
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
+                ReservationStatus.PENDING
+        );
+
+        ReservationEntity reservationToSave = new ReservationEntity();
+        ReservationEntity updatedReservation = new ReservationEntity();
+
+        Reservation expectedReservation = new Reservation(
+                null,
+                2L,
+                5L,
+                startDate,
+                endDate,
+                ReservationStatus.PENDING
+        );
+
+        Mockito.when(userRepository.findByUsername("admin"))
+                .thenReturn(Optional.of(userEntity));
+
+        Mockito.when(repository.findById(id))
+                .thenReturn(Optional.of(reservationEntity));
+
+        Mockito.when(mapper.toEntity(reservationToUpdate))
+                .thenReturn(reservationToSave);
+
+        Mockito.when(repository.save(reservationToSave))
+                .thenReturn(updatedReservation);
+
+        Mockito.when(mapper.toDomain(updatedReservation))
+                .thenReturn(expectedReservation);
+
+        Reservation actual = reservationService.updateReservation(id, updateReservation, "admin");
+
+        Assertions.assertEquals(expectedReservation, actual);
+        Assertions.assertEquals(ReservationStatus.PENDING, reservationToSave.getStatus());
+        Assertions.assertEquals(1L, reservationToSave.getId());
+        Assertions.assertEquals(2L, reservationToSave.getUserId());
+
+        Mockito.verify(repository).save(reservationToSave);
+    }
+
+    @Test
     void updateReservation_shouldThrowException_whenStatusNotPending() {
         Long id = 1L;
 
@@ -695,6 +818,68 @@ class ReservationServiceTest {
         Mockito.when(repository.findById(id)).thenReturn(Optional.of(reservationEntity));
 
         reservationService.cancelReservation(id, "Artem");
+
+        Mockito.verify(repository).setStatus(id, ReservationStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelReservation_shouldCancelReservation_whenUserIsAdmin() {
+        Long id = 1L;
+
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "admin",
+                "admin123",
+                Role.ADMIN
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                1L,
+                2L,
+                5L,
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
+                ReservationStatus.PENDING
+        );
+
+        Mockito.when(userRepository.findByUsername("admin"))
+                .thenReturn(Optional.of(userEntity));
+
+        Mockito.when(repository.findById(id))
+                .thenReturn(Optional.of(reservationEntity));
+
+        reservationService.cancelReservation(id, "admin");
+
+        Mockito.verify(repository).setStatus(id, ReservationStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelReservation_shouldCancelApprovedReservation_whenUserIsAdmin() {
+        Long id = 1L;
+
+        UserEntity userEntity = new UserEntity(
+                1L,
+                "admin",
+                "admin123",
+                Role.ADMIN
+        );
+
+        ReservationEntity reservationEntity = new ReservationEntity(
+                1L,
+                2L,
+                5L,
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 24),
+                ReservationStatus.APPROVED
+        );
+
+        Mockito.when(userRepository.findByUsername("admin"))
+                .thenReturn(Optional.of(userEntity));
+
+        Mockito.when(repository.findById(id))
+                .thenReturn(Optional.of(reservationEntity));
+
+        reservationService.cancelReservation(id, "admin");
 
         Mockito.verify(repository).setStatus(id, ReservationStatus.CANCELLED);
     }

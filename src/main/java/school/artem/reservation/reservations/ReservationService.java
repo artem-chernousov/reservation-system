@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import school.artem.reservation.reservations.availability.CreateReservationRequest;
 import school.artem.reservation.reservations.availability.ReservationAvailabilityService;
 import school.artem.reservation.reservations.availability.UpdateReservationRequest;
+import school.artem.reservation.user.Role;
 import school.artem.reservation.user.UserEntity;
 import school.artem.reservation.user.UserRepository;
 import school.artem.reservation.web.UserNotFoundException;
@@ -47,7 +48,10 @@ public class ReservationService {
         Long userId = userEntity.getId();
         Long userIdReservation = reservationEntity.getUserId();
 
-        if(!userId.equals(userIdReservation)) {
+        boolean isOwner = userId.equals(userIdReservation);
+        boolean isAdmin = userEntity.getRole() == Role.ADMIN;
+
+        if(!isOwner && !isAdmin) {
             throw new AccessDeniedException("You can't get this reservation");
         }
 
@@ -130,7 +134,7 @@ public class ReservationService {
 
         Long idUserReservation = reservationEntity.getUserId();
 
-        if(!idUserReservation.equals(userId)) {
+        if(!idUserReservation.equals(userId) && userEntity.getRole() != Role.ADMIN) {
             throw new AccessDeniedException("You can't modify this reservation");
         }
 
@@ -146,9 +150,11 @@ public class ReservationService {
             throw new IllegalArgumentException("Start date can't be in the past");
         }
 
+        Long reservationOwnerId = reservationEntity.getUserId();
+
         var reservationToUpdate = new Reservation(
                 null,
-                userEntity.getId(),
+                reservationOwnerId,
                 updateReservation.roomId(),
                 updateReservation.startDate(),
                 updateReservation.endDate(),
@@ -157,7 +163,7 @@ public class ReservationService {
 
         var reservationToSave = mapper.toEntity(reservationToUpdate);
         reservationToSave.setId(reservationEntity.getId());
-        reservationToSave.setUserId(userEntity.getId());
+        reservationToSave.setUserId(reservationOwnerId);
         reservationToSave.setStatus(ReservationStatus.PENDING);
 
         var updatedReservation = repository.save(reservationToSave);
@@ -173,17 +179,19 @@ public class ReservationService {
 
         Long userId = userEntity.getId();
 
-
         var reservation = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Not found reservation by id = " + id));
 
         Long idUserReservation = reservation.getUserId();
 
-        if(!idUserReservation.equals(userId)) {
+        boolean isOwner = idUserReservation.equals(userId);
+        boolean isAdmin = userEntity.getRole() == Role.ADMIN;
+
+        if(!isOwner && !isAdmin) {
             throw new AccessDeniedException("You can't cancel this reservation");
         }
 
-        if(reservation.getStatus().equals(ReservationStatus.APPROVED)) {
+        if(reservation.getStatus().equals(ReservationStatus.APPROVED) && !isAdmin) {
             throw new IllegalStateException("Can't cancel approved reservation. Contact with manager please");
         }
 
